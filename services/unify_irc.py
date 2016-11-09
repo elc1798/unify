@@ -1,5 +1,4 @@
-import socket, urllib2
-import string, random
+import socket, asyncore, asynchat
 import hashlib
 import time, os, sys
 
@@ -16,67 +15,100 @@ sys.path.append(os.sep.join(DIR_LEVELS))
 
 import config_irc as config
 
-class IRC_Session:
+# Since Python 2.x doesn't use 'print' as a function, we need to define our own reference
+def disp(s):
+    print(s)
+
+class IRC_Session(asynchat.async_chat):
 
     def __init__(self, debug=False):
-        self.s = None
-        self.connected = False
+        """
+        IRC Session initializer. Creates an internal variable for:
+            input_buffer    (str)
+            debug           (bool)
+            dispatch        (list)
+            msgstack        (list)
+            logged_in       (bool)
+
+        The 'recv' terminator is also set to a 'Windows' Style newline
+        """
+        asynchat.async_chat.__init__(self)
+        self.input_buffer = ''
+        self.set_terminator('\r\n')
         self.debug = debug
 
-    def connect(self):
-        if self.connected:
-            return
+        self.dispatch = []
+        self.msgstack = []
+        self.logged_in = False
 
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.connect( (config.HOST, config.PORT ))
+    def send_irc(self, args, *text):
+        """
+        Constructs an IRC compliant command
+        """
+        command = ' '.join(args)
+        if text:
+            command = command + " :" + ' '.join(text)
+        self.push(command + '\r\n')
+        if self.debug:
+            print "[SENT] %s" % (command,)
 
-        self.s.send("NICK %s\r\n" % (config.USERNAME,))
-        self.s.send("USER %s 8 * :%s\r\n" % (config.USERNAME, config.USERNAME))
+    def handle_connect(self):
+        """
+        Python asyncore function:
 
-        ping_pong = self.s.recv(512)
-        print "PING RECEIVED: ", repr(ping_pong)
-        ping_pong = ping_pong[5:]
-        print "PONT SENT: ", 'PONG %s\r\n' % (ping_pong,)
-        self.s.send('PONG %s\r\n' % (ping_pong,))
+        Is run when a connection is established via a socket.
 
-        wait_for_login = self.s.recv(512)
-        while "identify" not in wait_for_login:
-            wait_for_login = self.s.recv(512)
-            if self.debug:
-                print wait_for_login
+        Will set the NICK and USERNAME of bot upon connection
+        """
+        if self.debug:
+            print "Connection established."
+        self.send_irc(['NICK', config.USERNAME])
+        self.send_irc(['USER', config.USERNAME, '8', '*'], config.USERNAME)
 
-        self.s.send("JOIN %s\r\n" % (config.CHANNEL,))
-        self.s.send(config.LOGIN_MSG)
+    def collect_incoming_data(self, bytes):
+        """
+        Python asynchat function
 
-        wait_for_auth = self.s.recv(512)
-        while "End of /NAMES list." not in wait_for_auth:
-            wait_for_auth = self.s.recv(512)
-            if self.debug:
-                print wait_for_auth
+        Will aggregate data to be put into our input buffer
+        """
+        self.input_buffer += bytes
 
-        print "Log on successful"
-        self.connected = True
+    def found_terminator(self):
+        line = self.input_buffer
+        self.input_buffer = ""
 
-    def recv(self):
-        if not self.connected:
-            return
+        if self.debug:
+            print "[RECV] %s" % (line,)
 
-        msg = self.s.recv(512).split(":")
-        assert(len(msg) == 3)
+        if not self.logged_in:
+            if "This nickname is registered" in line:
+                self.send_irc(["PRIVMSG", "NickServ"], "IDENTIFY", config.PASSWORD)
+                self.send_irc(['JOIN'], config.CHANNEL)
+            if "You are now identified" in line:
+                self.logged_in = True
+        else:
+            msg = line.split("PRIVMSG %s :" % (config.CHANNEL,))
+            if len(line) > 0 and line[0] == ":" and len(msg) >= 2:
+                sender = msg[0].split("!")[0][1:]
+                contents = "PRIVMSG %s :" % (config.CHANNEL,)
+                contents = contents.join(msg[1:])
+                print "[CHAT] %s : %s" % (sender, contents)
+            else:
+                if not self.debug:
+                    print "[RECV] %s" % (line,)
 
-        sender = msg[1].split("!")[0]
-        contents = msg[2]
-        return (sender, contents)
-
-    def send(self, message):
-        if not self.connected:
-            return
-
-        self.s.send("PRIVMSG %s :%s\r\n" % (config.CHANNEL, message))
+    def run(self):
+        """
+        Function to create a socket and begin connection
+        """
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        if self.debug:
+            print "Connecting to %s:%s" % (config.HOST, config.PORT)
+        self.connect( (config.HOST, config.PORT) )
+        self.input_buffer = ''
+        asyncore.loop()
 
 if __name__ == "__main__":
-    sess = IRC_Session(debug=True)
-    sess.connect()
-    while True:
-        sess.recv()
+    bot = IRC_Session(debug=False)
+    bot.run()
 
