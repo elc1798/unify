@@ -1,5 +1,5 @@
 import socket, asyncore, asynchat
-import hashlib
+import hashlib, random
 import time, os, sys
 
 SCRIPT_PATH = os.path.realpath(__file__)
@@ -80,12 +80,18 @@ class IRC_Session(asynchat.async_chat):
         if self.debug:
             print "[RECV] %s" % (line,)
 
+        # IMPORTANT!
+        sep = line.split(" :")
+        if len(sep) >= 2 and sep[0] == "PING":
+            self.send_irc(['PONG'], " :".join(sep[1:]))
+
         if not self.logged_in:
             if "This nickname is registered" in line:
                 self.send_irc(["PRIVMSG", "NickServ"], "IDENTIFY", config.PASSWORD)
                 self.send_irc(['JOIN'], config.CHANNEL)
             if "You are now identified" in line:
                 self.logged_in = True
+                print "Logged on!"
         else:
             msg = line.split("PRIVMSG %s :" % (config.CHANNEL,))
             if len(line) > 0 and line[0] == ":" and len(msg) >= 2:
@@ -96,6 +102,14 @@ class IRC_Session(asynchat.async_chat):
             else:
                 if not self.debug:
                     print "[RECV] %s" % (line,)
+
+            t = random.randint(0, 10)
+            if t < 4:
+                self.send_chat_msg(t, sender="hukara")
+
+    def send_chat_msg(self, message, sender=""):
+        contents = "[ %s ] >>> %s" % (sender, message)
+        self.send_irc(["PRIVMSG", config.CHANNEL], contents)
 
     def run(self):
         """
@@ -109,6 +123,6 @@ class IRC_Session(asynchat.async_chat):
         asyncore.loop()
 
 if __name__ == "__main__":
-    bot = IRC_Session(debug=False)
+    bot = IRC_Session(debug=True)
     bot.run()
 

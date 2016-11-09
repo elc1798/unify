@@ -22,5 +22,6 @@ Register a private channel:
 /mode <channel> +i (set channel to invite only)
 /msg chanserv access <channel> add <nick> (for each person that should be able to join)
 /mode <channel> +I <nick> (for each person that should be able to join)
+/msg chanserv FLAGS <channel> <nick> +V (for each person that should be able to chat)
 ```
 
