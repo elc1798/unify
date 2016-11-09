@@ -34,7 +34,9 @@ class IRC_Session:
         self.s.send("USER %s 8 * :%s\r\n" % (config.USERNAME, config.USERNAME))
 
         ping_pong = self.s.recv(512)
+        print "PING RECEIVED: ", repr(ping_pong)
         ping_pong = ping_pong[5:]
+        print "PONT SENT: ", 'PONG %s\r\n' % (ping_pong,)
         self.s.send('PONG %s\r\n' % (ping_pong,))
 
         wait_for_login = self.s.recv(512)
@@ -52,6 +54,7 @@ class IRC_Session:
             if self.debug:
                 print wait_for_auth
 
+        print "Log on successful"
         self.connected = True
 
     def recv(self):
