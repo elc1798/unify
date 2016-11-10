@@ -15,10 +15,6 @@ sys.path.append(os.sep.join(DIR_LEVELS))
 
 import config_irc as config
 
-# Since Python 2.x doesn't use 'print' as a function, we need to define our own reference
-def disp(s):
-    print(s)
-
 class IRC_Session(asynchat.async_chat):
 
     def __init__(self, debug=False):
@@ -105,9 +101,9 @@ class IRC_Session(asynchat.async_chat):
 
             t = random.randint(0, 10)
             if t < 4:
-                self.send_chat_msg(t, sender="hukara")
+                self.broadcast(t, sender="hukara")
 
-    def send_chat_msg(self, message, sender=""):
+    def broadcast(self, message, sender=""):
         contents = "[ %s ] >>> %s" % (sender, message)
         self.send_irc(["PRIVMSG", config.CHANNEL], contents)
 

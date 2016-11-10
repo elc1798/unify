@@ -1,42 +1,86 @@
-"""
-This bot listens to port 5002 for incoming connections from Facebook. It takes
-in any messages that the bot receives and echos it back.
-"""
-from flask import Flask, request
-from pymessenger.bot import Bot
+import time, os, sys, threading
+import urllib2, requests, json
 
-app = Flask(__name__)
+SCRIPT_PATH = os.path.realpath(__file__)
+SCRIPT_PARENT_DIR = os.path.dirname(SCRIPT_PATH)
+DIR_LEVELS = SCRIPT_PARENT_DIR.split(os.sep)
 
-ACCESS_TOKEN = "EAAZAfaqKwEYEBAA5Q0Lllc0aFVfp2zvsYgxQoFt8WaPhEDaw3Ohl34oLzZCyR8FQDWZCSIkl2FMPYdQPH7iBDa0QcZA6Hebupe44uKx1E716I9NOciv4xstTucRJe6NU50py5j5fLQAdBfkHvYdWZCB06bQtSeWOADd8l9C3rHQZDZD"
-VERIFY_TOKEN = ""
-bot = Bot(ACCESS_TOKEN)
+# Sanity check: We should be in the 'services' directory
+assert(DIR_LEVELS[-1] == "services")
 
+# Add the config directory to the sys.path so we can import the IRC config
+DIR_LEVELS[-1] = "config"
+sys.path.append(os.sep.join(DIR_LEVELS))
 
-@app.route("/", methods=['GET', 'POST'])
-def hello():
-    if request.method == 'GET':
-        if request.args.get("hub.verify_token") == VERIFY_TOKEN:
-            return request.args.get("hub.challenge")
-        else:
-            return 'Invalid verification token'
+import config_facebook as config
+import AESCipher
 
-    if request.method == 'POST':
-        output = request.get_json()
-        for event in output['entry']:
-            messaging = event['messaging']
-            for x in messaging:
-                if x.get('message'):
-                    recipient_id = x['sender']['id']
-                    if x['message'].get('text'):
-                        message = x['message']['text']
-                        bot.send_text_message(recipient_id, message)
-                    if x['message'].get('attachment'):
-                        bot.send_attachment_url(recipient_id, x['message']['attachment']['type'],
-                                                x['message']['attachment']['payload']['url'])
+class Facebook_Session():
+
+    def __init__(self, debug=False):
+        """
+        Facebook Session initializer. Creates an internal variable for:
+            input_buffer    (str)
+            debug           (bool)
+            dispatch        (list)
+            msgstack        (list)
+            logged_in       (bool)
+
+        The 'recv' terminator is also set to a 'Windows' Style newline
+        """
+        self.enkryptor = AESCipher.AESCipher(config.KRYPT_KEY)
+        self.debug = debug
+
+    def process(self):
+        while True:
+            req = urllib2.Request(config.HOST + "/retrieve")
+            response = urllib2.urlopen(req)
+            contents = response.read()
+
+            for line in contents.split("\n"):
+
+                if len(line.strip()) == 0:
+                    continue
+
+                if self.debug:
+                    print "[RECV] %s" % (line,)
+
+                msg = self.enkryptor.decrypt(line).split(" >>> ")
+                if len(msg) < 3:
+                    print " >>> ".join(msg)
                 else:
-                    pass
-        return "Success"
+                    if msg[0] != config.AUTH_KEY:
+                        print "[WARN] INVALID AUTH_KEY"
+                        return
 
+                    sender = msg[1]
+                    contents = " >>> ".join(msg[2:])
+                    print "[CHAT] %s : %s" % (sender, contents)
+            time.sleep(0.5)
+
+    def broadcast(self, message, sender=""):
+        if self.debug:
+            print "[SENT] %s" % (message,)
+
+        contents = "%s >>> %s >>> %s" % (config.AUTH_KEY, sender, message)
+        contents = self.enkryptor.encrypt(contents)
+        headers = {'content-type': 'application/json'}
+
+        r = requests.post(config.HOST + "/send/", data=json.dumps( {'s':
+            contents}), headers=headers)
+
+        response = r.content
+        print response
+        if "ok" not in response:
+            print "[WARN] Send error"
 
 if __name__ == "__main__":
-    app.run(port=5002, debug=True)
+    bot = Facebook_Session(debug=True)
+    recieve_thread = threading.Thread(target=bot.process)
+    recieve_thread.daemon = True
+    recieve_thread.start()
+
+    while True:
+        a = str(raw_input("$> "))
+        bot.broadcast(a, sender="tester")
+
