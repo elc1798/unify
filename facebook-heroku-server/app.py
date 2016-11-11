@@ -12,11 +12,12 @@ app = Flask(__name__)
 
 known_recipients = []
 
-AUTH_KEY = "<AUTH_KEY_HERE>"
+AUTH_KEY = "<AUTH KEY HERE>"
 KRYPT_KEY = "<AES KEY HERE>"
 
 enkryptor = AESCipher.AESCipher(KRYPT_KEY)
 msg_queue = []
+
 
 @app.route('/send', methods=['POST'])
 @app.route('/send/', methods=['POST'])
@@ -85,7 +86,13 @@ def webhook():
                     message_text = messaging_event["message"]["text"]
 
                     if sender_id not in known_recipients:
-                        known_recipients.append(sender_id)
+                        if message_text != "AUTH %s" % (AUTH_KEY,):
+                            log("BAD AUTH FROM %s" % (sender_id,))
+                            return "ok", 200
+                        else:
+                            known_recipients.append(sender_id)
+                            log("GOOD AUTH FROM %s" % (sender_id,))
+                            return "ok", 200
 
                     contents = enkryptor.encrypt("%s >>> %s >>> %s" % (AUTH_KEY,
                         get_name_from_id(sender_id), message_text))
