@@ -17,7 +17,7 @@ import config_irc as config
 
 class IRC_Session(asynchat.async_chat):
 
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, controller=None):
         """
         IRC Session initializer. Creates an internal variable for:
             input_buffer    (str)
@@ -32,6 +32,7 @@ class IRC_Session(asynchat.async_chat):
         self.input_buffer = ''
         self.set_terminator('\r\n')
         self.debug = debug
+        self.controller = controller
 
         self.dispatch = []
         self.msgstack = []
@@ -94,14 +95,19 @@ class IRC_Session(asynchat.async_chat):
                 sender = msg[0].split("!")[0][1:]
                 contents = "PRIVMSG %s :" % (config.CHANNEL,)
                 contents = contents.join(msg[1:])
-                print "[CHAT] %s : %s" % (sender, contents)
+                if self.debug:
+                    print "[CHAT] %s : %s" % (sender, contents)
+                if self.controller is not None:
+                    self.controller.mass_broadcast(
+                        "irc",
+                        contents,
+                        sender=sender
+                    )
             else:
                 if not self.debug:
                     print "[RECV] %s" % (line,)
 
-            t = random.randint(0, 10)
-            if t < 4:
-                self.broadcast(t, sender="hukara")
+            # self.broadcast(t, sender="hukara")
 
     def broadcast(self, message, sender=""):
         contents = "[ %s ] >>> %s" % (sender, message)

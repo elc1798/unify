@@ -17,7 +17,7 @@ import AESCipher
 
 class Facebook_Session():
 
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, controller=None):
         """
         Facebook Session initializer. Creates an internal variable for:
             input_buffer    (str)
@@ -30,8 +30,9 @@ class Facebook_Session():
         """
         self.enkryptor = AESCipher.AESCipher(config.KRYPT_KEY)
         self.debug = debug
+        self.controller = controller
 
-    def process(self):
+    def run(self):
         while True:
             req = urllib2.Request(config.HOST + "/retrieve")
             response = urllib2.urlopen(req)
@@ -55,7 +56,14 @@ class Facebook_Session():
 
                     sender = msg[1]
                     contents = " >>> ".join(msg[2:])
-                    print "[CHAT] %s : %s" % (sender, contents)
+                    if self.debug:
+                        print "[CHAT] %s : %s" % (sender, contents)
+                    if self.controller is not None:
+                        self.controller.mass_broadcast(
+                            "facebook",
+                            contents,
+                            sender=sender
+                        )
             time.sleep(0.5)
 
     def broadcast(self, message, sender=""):
@@ -76,7 +84,7 @@ class Facebook_Session():
 
 if __name__ == "__main__":
     bot = Facebook_Session(debug=True)
-    recieve_thread = threading.Thread(target=bot.process)
+    recieve_thread = threading.Thread(target=bot.run)
     recieve_thread.daemon = True
     recieve_thread.start()
 
