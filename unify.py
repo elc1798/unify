@@ -14,6 +14,7 @@ class Broadcaster:
     def __init__(self, clients={}):
         self.clients = clients
         self.started = False
+        self.threads = []
 
     def add_client(self, client_id, obj):
         self.clients[client_id] = obj
@@ -25,6 +26,7 @@ class Broadcaster:
                 t = threading.Thread(target=self.clients[client].run)
                 t.daemon = True
                 t.start()
+                self.threads.append(t)
 
     def mass_broadcast(self, client_id, message, sender=""):
         for client in self.clients:
@@ -46,7 +48,7 @@ if __name__ == "__main__":
         main_broadcaster.add_client(
             client,
             CLIENT_MAP[client](
-                debug=True,
+                debug=False,
                 controller=main_broadcaster
             )
         )

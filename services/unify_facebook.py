@@ -78,7 +78,8 @@ class Facebook_Session():
             contents}), headers=headers)
 
         response = r.content
-        print response
+        if self.debug:
+            print response
         if "ok" not in response:
             print "[WARN] Send error"
 
