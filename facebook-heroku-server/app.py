@@ -1,12 +1,10 @@
-import os, asyncore
-import sys
-import json
+import os, sys, json
 
 import requests
 from flask import Flask, request
 
-import socket, asyncore
 import AESCipher
+import db_utils
 
 app = Flask(__name__)
 
@@ -16,8 +14,7 @@ AUTH_KEY = "<AUTH KEY HERE>"
 KRYPT_KEY = "<AES KEY HERE>"
 
 enkryptor = AESCipher.AESCipher(KRYPT_KEY)
-msg_queue = []
-
+SHARED_DATA = db_utils.UnifyDB()
 
 @app.route('/send', methods=['POST'])
 @app.route('/send/', methods=['POST'])
@@ -41,17 +38,16 @@ def send_to_fb():
         return "bad", 403
 
     contents = " >>> ".join(msg[1:])
-    for rec in known_recipients:
-        send_message(rec, contents)
+    for rec in SHARED_DATA.get_authed_users():
+        send_message(str(rec), contents)
 
     return "ok", 200
 
 @app.route('/retrieve')
 @app.route('/retrieve/')
 def retrieve():
-    global msg_queue
-    retval = "\n".join(msg_queue)
-    msg_queue[:] = []
+    global SHARED_DATA
+    retval = "\n".join( map(str, SHARED_DATA.get_messages()) )
     return retval, 200
 
 @app.route('/', methods=['GET'])
@@ -67,8 +63,7 @@ def verify():
 
 @app.route('/', methods=['POST'])
 def webhook():
-    global known_recipients
-    global msg_queue
+    global SHARED_DATA
     global enkryptor
 
     data = request.get_json()
@@ -83,21 +78,27 @@ def webhook():
 
                     sender_id = messaging_event["sender"]["id"]
                     recipient_id = messaging_event["recipient"]["id"]
-                    message_text = messaging_event["message"]["text"]
+                    message_text = "<< Sent Non-ASCII Data >>"
+                    if "text" in messaging_event["message"]:
+                        message_text = messaging_event["message"]["text"]
 
-                    if sender_id not in known_recipients:
-                        if message_text != "AUTH %s" % (AUTH_KEY,):
-                            log("BAD AUTH FROM %s" % (sender_id,))
-                            return "ok", 200
-                        else:
-                            known_recipients.append(sender_id)
+                    if not SHARED_DATA.check_user_auth(sender_id):
+                        if message_text == "AUTH %s" % (AUTH_KEY,):
+                            SHARED_DATA.add_user_auth(sender_id)
                             log("GOOD AUTH FROM %s" % (sender_id,))
                             return "ok", 200
+                        elif message_text == "DEAUTH %s" % (AUTH_KEY,):
+                            SHARED_DATA.revoke_user_auth(sender_id)
+                            log("DEAUTH FROM %s" % (sender_id,))
+                            return "ok", 200
+                        else:
+                            log("BAD AUTH FROM %s" % (sender_id,))
+                            return "Bad Unify Authentification Token", 403
 
                     contents = enkryptor.encrypt("%s >>> %s >>> %s" % (AUTH_KEY,
                         get_name_from_id(sender_id), message_text))
 
-                    msg_queue.append(contents)
+                    SHARED_DATA.add_message(contents)
 
                 if messaging_event.get("delivery"):
                     pass

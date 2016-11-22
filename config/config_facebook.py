@@ -1,5 +1,5 @@
 """
-Facebook Socket Node Settings
+Facebook Connector Settings
 """
 HOST = ""                   # Facebook Heroku application endpoint
 AUTH_KEY = ""               # Authentication key
