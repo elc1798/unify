@@ -47,7 +47,7 @@ class Connection:
         """
         Destroys the internal variables of this class
         """
-        print "CALLING DELETE ON CONNECTION"
+        # print "CALLING DELETE ON CONNECTION"
         self.conn.close()
         del self.cursor
         del self.conn
@@ -120,7 +120,7 @@ class DatabaseVerifier:
                 return False
 
     def __del__(self):
-        print "CALLING DELETE ON DatabaseVerifier"
+        # print "CALLING DELETE ON DatabaseVerifier"
         self.execute = None
         del self.execute
 
@@ -143,7 +143,7 @@ class UnifyDB:
     def get_messages(self):
         retval = self.execute("SELECT * FROM messages;")
         self.delete_messages()
-        return retval
+        return map(lambda l: str(l[0]), retval) if retval is not None else None
 
     def add_user_auth(self, name):
         self.execute("INSERT INTO sessions VALUES ( ? );", (name,))
@@ -155,10 +155,11 @@ class UnifyDB:
         return len(self.execute("SELECT * FROM sessions WHERE key=?;", (name,))) > 0
 
     def get_authed_users(self):
-        return self.execute("SELECT * FROM sessions;")
+        retval = self.execute("SELECT * FROM sessions;")
+        return map(lambda l: str(l[0]), retval) if retval is not None else None
 
     def __del__(self):
-        print "CALLING DELETE ON UNIFYDB"
+        # print "CALLING DELETE ON UNIFYDB"
         self.execute = None
         del self.execute
 

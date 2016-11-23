@@ -54,7 +54,7 @@ class Facebook_Session():
                         print "[WARN] INVALID AUTH_KEY"
                         return
 
-                    sender = msg[1]
+                    sender = "<Facebook> " + msg[1]
                     contents = " >>> ".join(msg[2:])
                     if self.debug:
                         print "[CHAT] %s : %s" % (sender, contents)

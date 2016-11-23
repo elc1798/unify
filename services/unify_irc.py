@@ -92,7 +92,7 @@ class IRC_Session(asynchat.async_chat):
         else:
             msg = line.split("PRIVMSG %s :" % (config.CHANNEL,))
             if len(line) > 0 and line[0] == ":" and len(msg) >= 2:
-                sender = msg[0].split("!")[0][1:]
+                sender = "<irc> " + msg[0].split("!")[0][1:]
                 contents = "PRIVMSG %s :" % (config.CHANNEL,)
                 contents = contents.join(msg[1:])
                 if self.debug:
@@ -110,7 +110,7 @@ class IRC_Session(asynchat.async_chat):
             # self.broadcast(t, sender="hukara")
 
     def broadcast(self, message, sender=""):
-        contents = "[ %s ] >>> %s" % (sender, message)
+        contents = "%s >>> %s" % (sender, message)
         self.send_irc(["PRIVMSG", config.CHANNEL], contents)
 
     def run(self):

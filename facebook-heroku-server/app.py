@@ -8,8 +8,6 @@ import db_utils
 
 app = Flask(__name__)
 
-known_recipients = []
-
 AUTH_KEY = "<AUTH KEY HERE>"
 KRYPT_KEY = "<AES KEY HERE>"
 
@@ -82,18 +80,22 @@ def webhook():
                     if "text" in messaging_event["message"]:
                         message_text = messaging_event["message"]["text"]
 
+                    log(message_text)
                     if not SHARED_DATA.check_user_auth(sender_id):
                         if message_text == "AUTH %s" % (AUTH_KEY,):
                             SHARED_DATA.add_user_auth(sender_id)
                             log("GOOD AUTH FROM %s" % (sender_id,))
+                            send_message(sender_id, "[UNIFY_SERVER] You have been authed")
                             return "ok", 200
                         elif message_text == "DEAUTH %s" % (AUTH_KEY,):
                             SHARED_DATA.revoke_user_auth(sender_id)
                             log("DEAUTH FROM %s" % (sender_id,))
+                            send_message(sender_id, "[UNIFY_SERVER] You have been deauthed")
                             return "ok", 200
                         else:
                             log("BAD AUTH FROM %s" % (sender_id,))
-                            return "Bad Unify Authentification Token", 403
+                            send_message(sender_id, "[UNIFY_SERVER] You have not yet been authenticated")
+                            return "ok", 200
 
                     contents = enkryptor.encrypt("%s >>> %s >>> %s" % (AUTH_KEY,
                         get_name_from_id(sender_id), message_text))
