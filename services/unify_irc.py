@@ -110,7 +110,7 @@ class IRC_Session(asynchat.async_chat):
             # self.broadcast(t, sender="hukara")
 
     def broadcast(self, message, sender=""):
-        contents = "%s >>> %s" % (sender, message)
+        contents = "%s :: %s" % (sender, message)
         self.send_irc(["PRIVMSG", config.CHANNEL], contents)
 
     def run(self):

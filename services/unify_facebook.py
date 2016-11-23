@@ -70,7 +70,7 @@ class Facebook_Session():
         if self.debug:
             print "[SENT] %s" % (message,)
 
-        contents = "%s >>> %s >>> %s" % (config.AUTH_KEY, sender, message)
+        contents = "%s >>> %s :: %s" % (config.AUTH_KEY, sender, message)
         contents = self.enkryptor.encrypt(contents)
         headers = {'content-type': 'application/json'}
 
